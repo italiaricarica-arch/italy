@@ -1,0 +1,23 @@
+{
+    "pushplus_token": "",
+    "pushplus_topic": "",
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+    "sms_secret_id": "",
+    "sms_secret_key": "",
+    "sms_sdk_app_id": "",
+    "sms_sign_name": "Velocevoce",
+    "sms_tpl_recharge": "2930147",
+    "company_name": "Velocevoce 惟落雀",
+    "adb_path": "C:\\LDPlayer\\adb.exe",
+    "poll_interval": 10,
+    "page_load_wait": 3,
+    "action_delay_min": 2,
+    "action_delay_max": 5,
+    "payment_result_wait": 10,
+    "guagua_package": "com.riceguagua.android",
+    "guagua_recharge_text": "充话费",
+    "manual_operators": ["CMLink", "Kena", "DailyTelecom"],
+    "server_url": "http://localhost:8000",
+    "accounts": []
+}

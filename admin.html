@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VeloceVoce 管理后台</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; text-align: center; }
+    .stat-value { font-size: 28px; font-weight: 700; color: #c9a84c; }
+    .stat-label { color: #aaa; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { color: #aaa; font-weight: 600; text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; }
+    td { padding: 8px 10px; border-bottom: 1px solid #222; vertical-align: middle; }
+    tr:hover td { background: #1a1a1a; }
+    .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; background: #1a1a1a; border-radius: 8px; padding: 3px; width: fit-content; }
+    .tab-item { padding: 8px 18px; cursor: pointer; color: #aaa; border-radius: 6px; font-size: 14px; font-weight: 600; }
+    .tab-item.active { background: #c9a84c; color: #111; }
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .filter-btn { padding: 5px 12px; background: #222; border: 1px solid #333; border-radius: 6px; cursor: pointer; color: #aaa; font-size: 13px; }
+    .filter-btn.active, .filter-btn:hover { border-color: #c9a84c; color: #c9a84c; }
+    #loginScreen { max-width: 360px; margin: 120px auto; }
+  </style>
+</head>
+<body>
+
+<!-- 登录界面 -->
+<div id="loginScreen">
+  <div class="card">
+    <div class="modal-title" style="margin-bottom:20px;">管理后台登录</div>
+    <div class="form-group">
+      <label>管理员密码</label>
+      <input type="password" id="adminPwd" placeholder="密码" onkeydown="if(event.key==='Enter')doAdminLogin()">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="doAdminLogin()">登录</button>
+    <p id="loginErr" class="text-danger mt-1" style="font-size:13px;text-align:center;"></p>
+  </div>
+</div>
+
+<!-- 管理界面 -->
+<div id="adminScreen" class="hidden">
+  <header class="header">
+    <span class="logo-text">VeloceVoce 管理后台</span>
+    <div class="flex items-center gap-2">
+      <button class="btn btn-secondary btn-sm" onclick="toggleCny()">切换春节促销</button>
+      <button class="btn btn-danger btn-sm" onclick="doAdminLogout()">退出</button>
+    </div>
+  </header>
+
+  <div class="container" style="padding-top:24px;">
+    <div class="tab-bar">
+      <div class="tab-item active" onclick="showTab('orders')">订单管理</div>
+      <div class="tab-item" onclick="showTab('users')">用户管理</div>
+      <div class="tab-item" onclick="showTab('stats')">统计</div>
+    </div>
+
+    <!-- 统计 -->
+    <div id="tab-stats" class="hidden">
+      <div class="stat-grid" id="statsGrid">
+        <p class="text-muted">加载中...</p>
+      </div>
+    </div>
+
+    <!-- 订单 -->
+    <div id="tab-orders">
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="setOrderFilter('')">全部</button>
+        <button class="filter-btn" onclick="setOrderFilter('charged')">待处理</button>
+        <button class="filter-btn" onclick="setOrderFilter('processing')">充值中</button>
+        <button class="filter-btn" onclick="setOrderFilter('awaiting_payment')">待付款</button>
+        <button class="filter-btn" onclick="setOrderFilter('completed')">已完成</button>
+        <button class="filter-btn" onclick="setOrderFilter('failed')">失败</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="ordersTable">
+          <thead>
+            <tr>
+              <th>订单ID</th><th>用户</th><th>号码</th><th>运营商</th>
+              <th>金额</th><th>赊账</th><th>状态</th><th>时间</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody">
+            <tr><td colspan="9" class="text-muted">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="ordersPager" class="flex gap-2 mt-2"></div>
+    </div>
+
+    <!-- 用户 -->
+    <div id="tab-users" class="hidden">
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>用户ID</th><th>邮箱</th><th>手机</th><th>信用额度</th>
+              <th>信用等级</th><th>是否封禁</th><th>注册时间</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody">
+            <tr><td colspan="8" class="text-muted">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+let adminToken = sessionStorage.getItem('admin_token') || '';
+let orderFilter = '';
+let orderPage = 1;
+
+if (adminToken) showAdminScreen();
+
+async function doAdminLogin() {
+  const pwd = document.getElementById('adminPwd').value;
+  try {
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwd })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || '密码错误');
+    adminToken = data.token;
+    sessionStorage.setItem('admin_token', adminToken);
+    showAdminScreen();
+  } catch (e) {
+    document.getElementById('loginErr').textContent = e.message;
+  }
+}
+
+function showAdminScreen() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('adminScreen').classList.remove('hidden');
+  loadOrders();
+}
+
+async function doAdminLogout() {
+  await apiFetch('/api/admin/logout', 'POST');
+  adminToken = '';
+  sessionStorage.removeItem('admin_token');
+  location.reload();
+}
+
+function showTab(name) {
+  ['orders','users','stats'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
+  });
+  document.querySelectorAll('.tab-item').forEach((el, i) => {
+    el.classList.toggle('active', ['orders','users','stats'][i] === name);
+  });
+  if (name === 'stats') loadStats();
+  if (name === 'users') loadUsers();
+  if (name === 'orders') loadOrders();
+}
+
+function setOrderFilter(f) {
+  orderFilter = f;
+  orderPage = 1;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.includes(f) || (!f && b.textContent === '全部'));
+  });
+  loadOrders();
+}
+
+async function loadStats() {
+  const grid = document.getElementById('statsGrid');
+  try {
+    const data = await apiFetch('/api/admin/stats');
+    grid.innerHTML = `
+      <div class="stat-card"><div class="stat-value">${data.total_users}</div><div class="stat-label">注册用户</div></div>
+      <div class="stat-card"><div class="stat-value">${data.total_orders}</div><div class="stat-label">总订单</div></div>
+      <div class="stat-card"><div class="stat-value">${data.completed_orders}</div><div class="stat-label">已完成</div></div>
+      <div class="stat-card"><div class="stat-value">${data.pending_orders}</div><div class="stat-label">待处理</div></div>
+      <div class="stat-card"><div class="stat-value">€${(data.total_revenue||0).toFixed(2)}</div><div class="stat-label">总收入</div></div>
+      <div class="stat-card"><div class="stat-value">${data.today_orders}</div><div class="stat-label">今日订单</div></div>
+    `;
+  } catch (e) {
+    grid.innerHTML = `<p class="text-danger">加载失败: ${e.message}</p>`;
+  }
+}
+
+async function loadOrders() {
+  const tbody = document.getElementById('ordersBody');
+  tbody.innerHTML = '<tr><td colspan="9" class="text-muted">加载中...</td></tr>';
+  try {
+    const qs = `?status=${orderFilter}&page=${orderPage}&per_page=20`;
+    const data = await apiFetch('/api/admin/orders' + qs);
+    if (!data.orders.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="text-muted">暂无订单</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.orders.map(o => `
+      <tr>
+        <td style="font-family:monospace;">${o.id.substring(0,8)}</td>
+        <td>${o.email || o.user_phone || o.user_id.substring(0,8)}</td>
+        <td>${o.phone}</td>
+        <td>${o.operator}</td>
+        <td style="color:#c9a84c;font-weight:700;">€${o.amount}</td>
+        <td>${o.is_credit ? '✓' : ''}</td>
+        <td><span class="order-status status-${o.status}">${o.status}</span></td>
+        <td style="color:#aaa;">${o.created_at.substring(0,16)}</td>
+        <td>
+          ${['charged','processing','paying'].includes(o.status) ? `<button class="btn btn-sm btn-primary" onclick="updateOrder('${o.id}','completed','')">完成</button> ` : ''}
+          ${['charged','processing','paying','awaiting_payment'].includes(o.status) ? `<button class="btn btn-sm btn-danger" onclick="updateOrder('${o.id}','failed','操作取消')">失败</button>` : ''}
+          ${o.status==='awaiting_payment' ? `<button class="btn btn-sm btn-secondary" onclick="confirmPayment('${o.id}')">确认付款</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+    const pager = document.getElementById('ordersPager');
+    const totalPages = Math.ceil(data.total / 20);
+    pager.innerHTML = '';
+    for (let p = 1; p <= Math.min(totalPages, 10); p++) {
+      const b = document.createElement('button');
+      b.className = 'filter-btn' + (p === orderPage ? ' active' : '');
+      b.textContent = p;
+      b.onclick = () => { orderPage = p; loadOrders(); };
+      pager.appendChild(b);
+    }
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-danger">加载失败: ${e.message}</td></tr>`;
+  }
+}
+
+async function updateOrder(id, status, message) {
+  try {
+    await apiFetch(`/api/admin/orders/${id}`, 'PUT', { status, message });
+    showToast('操作成功', 'success');
+    loadOrders();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function confirmPayment(id) {
+  try {
+    await apiFetch(`/api/admin/confirm-payment/${id}`, 'POST');
+    showToast('已确认付款，订单进入充值队列', 'success');
+    loadOrders();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function loadUsers() {
+  const tbody = document.getElementById('usersBody');
+  tbody.innerHTML = '<tr><td colspan="8" class="text-muted">加载中...</td></tr>';
+  try {
+    const data = await apiFetch('/api/admin/users');
+    tbody.innerHTML = data.users.map(u => `
+      <tr>
+        <td style="font-family:monospace;">${u.id.substring(0,8)}</td>
+        <td>${u.email || ''}</td>
+        <td>${u.phone || ''}</td>
+        <td style="color:#c9a84c;">€${(u.credit_amount||0).toFixed(2)}</td>
+        <td>${u.credit_level || '新手'}</td>
+        <td>${u.is_blocked ? '<span style="color:#e05252;">封禁</span>' : '<span style="color:#4caf50;">正常</span>'}</td>
+        <td style="color:#aaa;">${u.created_at.substring(0,10)}</td>
+        <td>
+          ${u.is_blocked
+            ? `<button class="btn btn-sm btn-secondary" onclick="blockUser('${u.id}',false)">解封</button>`
+            : `<button class="btn btn-sm btn-danger" onclick="blockUser('${u.id}',true)">封禁</button>`}
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-danger">加载失败: ${e.message}</td></tr>`;
+  }
+}
+
+async function blockUser(id, block) {
+  const path = block ? `/api/admin/users/${id}/block` : `/api/admin/users/${id}/unblock`;
+  try {
+    await apiFetch(path, 'POST');
+    showToast(block ? '已封禁' : '已解封', 'success');
+    loadUsers();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function toggleCny() {
+  try {
+    const data = await apiFetch('/api/admin/toggle-cny', 'POST');
+    showToast(`春节促销已${data.cny_active ? '开启' : '关闭'}`, 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function apiFetch(path, method, body) {
+  method = method || 'GET';
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' }
+  };
+  if (adminToken) opts.headers['Authorization'] = 'Bearer ' + adminToken;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.detail || `请求失败 (${res.status})`);
+  return json;
+}
+
+function showToast(msg, type) {
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast ${type || 'info'}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 350); }, 3500);
+}
+</script>
+</body>
+</html>

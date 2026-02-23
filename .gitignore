@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+.cache/
+.pip/
+*.db
+recharge.db
+node_modules/
+.env
+*.log
+nohup.out
+.orca_term/
+.ssh/
+*.tar.gz
+screenshot_*.png
+payment_reminders.json

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VeloceVoce 惟落雀 - 意大利手机充值</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <a href="/" class="logo-link">
+    <svg class="logo-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="18" cy="18" r="18" fill="#c9a84c" opacity="0.15"/>
+      <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="18" fill="#c9a84c" font-weight="bold">V</text>
+    </svg>
+    <span class="logo-text">VeloceVoce</span>
+  </a>
+  <div class="nav-actions" id="navActions">
+    <!-- 未登录 -->
+    <div id="navGuest">
+      <button class="btn btn-secondary btn-sm" onclick="openAuth('login')">登录</button>
+      <button class="btn btn-primary btn-sm" onclick="openAuth('register')">注册</button>
+    </div>
+    <!-- 已登录 -->
+    <div id="navUser" class="hidden flex items-center gap-3">
+      <!-- 消息通知铃铛 (msgBell / msgBadge) -->
+      <div class="msg-bell-wrap" id="msgBell" onclick="openMessages()" title="消息通知">
+        🔔
+        <span class="msg-badge hidden" id="msgBadge">0</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btnUserMenu" onclick="toggleUserMenu()">我的账户 ▾</button>
+      <div id="userDropdown" class="hidden" style="position:absolute;top:56px;right:24px;background:#1a1a1a;border:1px solid #333;border-radius:8px;min-width:160px;z-index:200;padding:8px 0;">
+        <a href="#" onclick="showSection('orders');closeUserMenu()" style="display:block;padding:10px 16px;color:#f0f0f0;font-size:14px;">我的订单</a>
+        <a href="#" onclick="showSection('credit');closeUserMenu()" style="display:block;padding:10px 16px;color:#f0f0f0;font-size:14px;">信用额度</a>
+        <hr style="border-color:#333;margin:4px 0;">
+        <a href="#" onclick="doLogout()" style="display:block;padding:10px 16px;color:#e05252;font-size:14px;">退出登录</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero" id="heroSection">
+  <h1>🇮🇹 意大利手机充值</h1>
+  <p>支持 TIM、Vodafone、WindTre、Iliad 等主流运营商，快速到账</p>
+  <button class="btn btn-primary" onclick="openAuth('register')">立即注册，获 €10 信用额度</button>
+</section>
+
+<!-- 主要充值区域 -->
+<main class="container section">
+  <!-- 充值表单卡片 -->
+  <div id="rechargeSection">
+    <div class="card" style="max-width:520px;margin:0 auto;">
+      <div class="section-title">充值</div>
+
+      <div class="form-group">
+        <label>意大利手机号</label>
+        <input type="tel" id="inputPhone" placeholder="3xx xxxx xxxx" maxlength="15">
+      </div>
+
+      <div class="form-group">
+        <label>运营商</label>
+        <select id="inputOperator">
+          <option value="">选择运营商</option>
+          <option value="TIM">TIM</option>
+          <option value="Vodafone">Vodafone</option>
+          <option value="WindTre">WindTre</option>
+          <option value="Iliad">Iliad</option>
+          <option value="Very">Very Mobile</option>
+          <option value="Lycamobile">Lycamobile</option>
+          <option value="CMLink">CMLink</option>
+          <option value="DailyTelecom">DailyTelecom</option>
+          <option value="ho.">ho.</option>
+          <option value="Kena">Kena Mobile</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>充值金额</label>
+        <div class="amount-grid" id="amountGrid">
+          <div class="amount-btn" data-amount="5" onclick="selectAmount(5)">€5</div>
+          <div class="amount-btn" data-amount="10" onclick="selectAmount(10)">€10</div>
+          <div class="amount-btn" data-amount="15" onclick="selectAmount(15)">€15</div>
+          <div class="amount-btn" data-amount="20" onclick="selectAmount(20)">€20<div class="bonus">+€10</div></div>
+          <div class="amount-btn" data-amount="25" onclick="selectAmount(25)">€25</div>
+          <div class="amount-btn" data-amount="30" onclick="selectAmount(30)">€30</div>
+          <div class="amount-btn" data-amount="50" onclick="selectAmount(50)">€50<div class="bonus">+€20</div></div>
+        </div>
+      </div>
+
+      <div id="creditOption" class="hidden form-group">
+        <label>
+          <input type="checkbox" id="chkCredit"> 使用信用额度赊账
+          <span class="text-muted" style="font-size:12px;">（可用: <span id="smCreditCard">€0</span>）</span>
+        </label>
+      </div>
+
+      <button class="btn btn-primary btn-full" id="btnRecharge" onclick="submitRecharge()">确认充值</button>
+      <p class="text-muted mt-1" style="font-size:12px;text-align:center;">充值前请确认手机号和运营商正确</p>
+    </div>
+  </div>
+
+  <!-- 订单列表 -->
+  <div id="ordersSection" class="hidden mt-3">
+    <div class="section-title">我的订单</div>
+    <div class="order-list" id="orderList">
+      <p class="text-muted">加载中...</p>
+    </div>
+  </div>
+
+  <!-- 信用额度 -->
+  <div id="creditSection" class="hidden mt-3">
+    <div class="section-title">信用额度</div>
+    <div class="credit-card" id="creditCardInfo">
+      <div class="credit-label">可用信用额度</div>
+      <div class="credit-amount" id="creditAmountDisplay">€0</div>
+      <div class="credit-label mt-1" id="creditLevelDisplay"></div>
+    </div>
+    <div id="creditLevelsInfo" class="mt-2"></div>
+  </div>
+</main>
+
+<!-- Footer (单一 footer，包含正确地址信息) -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <div style="color:#c9a84c;font-weight:700;margin-bottom:4px;">VeloceVoce 惟落雀</div>
+      <div>Via Sarpi 30, 20154 Milano, Italia</div>
+      <!-- TODO: 请将下方占位税号替换为实际注册税号 -->
+      <div>P.IVA: IT 19890318xG</div>
+    </div>
+    <div class="footer-links">
+      <a href="/help">帮助中心</a>
+      <a href="/legal">法律信息</a>
+      <a href="/privacy">隐私政策</a>
+      <a href="/terms">服务条款</a>
+      <a href="/cookies">Cookie 政策</a>
+    </div>
+    <div class="text-muted" style="font-size:12px;">
+      © 2025 Velocevoce 惟落雀. All rights reserved.
+    </div>
+  </div>
+</footer>
+
+<!-- 认证模态框 (包含 authTitle 元素) -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAuth()">✕</button>
+    <div class="modal-title" id="authTitle">登录</div>
+    <div class="auth-tabs">
+      <div class="auth-tab" id="tabLogin" onclick="switchAuth('login')">登录</div>
+      <div class="auth-tab" id="tabRegister" onclick="switchAuth('register')">注册</div>
+    </div>
+
+    <!-- 登录表单 -->
+    <div id="loginForm">
+      <div class="form-group">
+        <label>邮箱 / 手机号</label>
+        <input type="text" id="loginAccount" placeholder="邮箱或手机号">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="loginPassword" placeholder="密码">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()">登录</button>
+    </div>
+
+    <!-- 注册表单 -->
+    <div id="registerForm" class="hidden">
+      <div class="form-group">
+        <label>邮箱</label>
+        <input type="email" id="regEmail" placeholder="邮箱地址">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="regPassword" placeholder="至少6位">
+      </div>
+      <div class="form-group">
+        <label>昵称（可选）</label>
+        <input type="text" id="regName" placeholder="昵称">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="doRegister()">注册</button>
+      <p class="text-muted mt-1" style="font-size:12px;text-align:center;">注册即同意<a href="/terms">服务条款</a>和<a href="/privacy">隐私政策</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- 消息通知模态框 -->
+<div class="modal-overlay" id="messagesModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeMessages()">✕</button>
+    <div class="modal-title">消息通知</div>
+    <div id="messageList" style="max-height:400px;overflow-y:auto;">
+      <p class="text-muted">加载中...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Toast 容器 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
